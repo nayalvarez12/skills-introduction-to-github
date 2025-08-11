@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROLLVENTURE - Presentación del Proyecto</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            overflow: hidden;
+        }
+
+        .presentation-container {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .slide {
+            width: 90%;
+            max-width: 1200px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            padding: 60px;
+            display: none;
+            animation: slideIn 0.6s ease-out;
+        }
+
+        .slide.active {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .slide-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .slide-title {
+            font-size: 3em;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .slide-subtitle {
+            font-size: 1.3em;
+            color: #7f8c8d;
+            font-weight: 300;
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            align-items: center;
+        }
+
+        .content-single {
+            text-align: center;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
+            color: white;
+            padding: 15px 25px;
+            margin: 15px 0;
+            border-radius: 12px;
+            font-size: 1.1em;
+            box-shadow: 0 4px 15px rgba(116, 185, 255, 0.3);
+            transform: translateX(-10px);
+            opacity: 0;
+            animation: slideInLeft 0.6s ease-out forwards;
+        }
+
+        .feature-list li:nth-child(1) { animation-delay: 0.1s; }
+        .feature-list li:nth-child(2) { animation-delay: 0.2s; }
+        .feature-list li:nth-child(3) { animation-delay: 0.3s; }
+        .feature-list li:nth-child(4) { animation-delay: 0.4s; }
+        .feature-list li:nth-child(5) { animation-delay: 0.5s; }
+
+        @keyframes slideInLeft {
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .team-member {
+            text-align: center;
+            padding: 25px;
+            background: linear-gradient(135deg, #a8edea, #fed6e3);
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            transform: scale(0.9);
+            opacity: 0;
+            animation: popIn 0.6s ease-out forwards;
+        }
+
+        .team-member:nth-child(1) { animation-delay: 0.1s; }
+        .team-member:nth-child(2) { animation-delay: 0.2s; }
+        .team-member:nth-child(3) { animation-delay: 0.3s; }
+
+        @keyframes popIn {
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .game-preview {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .game-preview h3 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .game-link {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px 30px;
+            border-radius: 25px;
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-top: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .game-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .navigation {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 1000;
+        }
+
+        .nav-btn {
+            padding: 12px 25px;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            color: #2c3e50;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn:hover {
+            background: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .slide-counter {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: 600;
+            color: #2c3e50;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .text-large {
+            font-size: 1.3em;
+            line-height: 1.6;
+            color: #34495e;
+        }
+
+        .highlight {
+            background: linear-gradient(120deg, #a8edea 0%, #fed6e3 100%);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            border-left: 5px solid #74b9ff;
+        }
+
+        .price-tag {
+            font-size: 3em;
+            font-weight: 700;
+            color: #27ae60;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-container">
+        <div class="slide-counter">
+            <span id="current-slide">1</span> / <span id="total-slides">8</span>
+        </div>
+
+        <!-- Slide 1: Portada -->
+        <div class="slide active">
+            <div class="content-single">
+                <h1 class="slide-title">ROLLVENTURE</h1>
+                <p class="slide-subtitle">Proyecto Final de Videojuegos</p>
+                <div class="game-preview" style="margin-top: 50px;">
+                    <h3>🎮 Aventura Interactiva 🎲</h3>
+                    <p class="text-large">Una experiencia de juego única que combina aventura y estrategia</p>
+                    <a href="https://jossls.github.io/ROLLVENTURE/" class="game-link" target="_blank">
+                        🚀 Jugar Ahora
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 2: Integrantes del Equipo -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2 class="slide-title">Nuestro Equipo</h2>
+                <p class="slide-subtitle">Las desarrolladoras detrás de ROLLVENTURE</p>
+            </div>
+            <div class="team-grid">
+                <div class="team-member">
+                    <h3>👩‍💻 Co-Desarrolladora</h3>
+                    <p><strong>Rosalinda Bautista</strong></p>
+                    <p>Programación y Mecánicas</p>
+                </div>
+                <div class="team-member">
+                    <h3>🎨 Co-Desarrolladora</h3>
+                    <p><strong>Naydelin Alvarez</strong></p>
+                    <p>Diseño y Experiencia</p>
+                </div>
+                <div class="team-member">
+                    <h3>🌱 Enfoque Conjunto</h3>
+                    <p><strong>Desarrollo Sustentable</strong></p>
+                    <p>Conciencia Ecológica</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 3: Necesidad/Problemática -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2 class="slide-title">Problemática Ambiental</h2>
+                <p class="slide-subtitle">El desafío de la educación en sustentabilidad</p>
+            </div>
+            <div class="content-single">
+                <div class="highlight">
+                    <p class="text-large">
+                        <strong>🌍 Desafío Global:</strong> La falta de conciencia sobre sustentabilidad y el cuidado del medio ambiente, especialmente entre los jóvenes. Necesitamos herramientas innovadoras para educar sobre estos temas críticos.
+                    </p>
+                </div>
+                <div class="highlight">
+                    <p class="text-large">
+                        <strong>♻️ Nuestra Solución:</strong> ROLLVENTURE utiliza la gamificación para enseñar principios de sustentabilidad de manera atractiva e interactiva, haciendo que el aprendizaje sobre el cuidado del planeta sea divertido.
+                    </p>
+                </div>
+                <div class="highlight">
+                    <p class="text-large">
+                        <strong>🎯 Impacto Educativo:</strong> A través del juego, promovemos la reflexión sobre nuestro impacto ambiental y la importancia de adoptar prácticas sustentables en la vida diaria.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 4: Descripción de la Aplicación -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2 class="slide-title">¿Qué es ROLLVENTURE?</h2>
+                <p class="slide-subtitle">Videojuego educativo enfocado en sustentabilidad</p>
+            </div>
+            <div class="content-grid">
+                <div>
+                    <p class="text-large">
+                        ROLLVENTURE es un videojuego web innovador específicamente diseñado para educar sobre sustentabilidad y cuidado del medio ambiente a través de una aventura interactiva.
+                    </p>
+                    <div class="highlight">
+                        <p><strong>🌱 Misión:</strong> Educar sobre sustentabilidad de manera divertida e interactiva</p>
+                    </div>
+                    <div class="highlight">
+                        <p><strong>♻️ Enfoque:</strong> Principios de desarrollo sustentable integrados en el gameplay</p>
+                    </div>
+                </div>
+                <div class="game-preview">
+                    <h3>🌟 Características Sustentables</h3>
+                    <ul class="feature-list">
+                        <li>🌍 Temática completamente ambiental</li>
+                        <li>♻️ Conceptos de sustentabilidad integrados</li>
+                        <li>🎮 Aventura con propósito educativo</li>
+                        <li>📚 Aprendizaje sobre el cuidado del planeta</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 5: Público Objetivo -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2 class="slide-title">¿A Quién va Dirigido?</h2>
+                <p class="slide-subtitle">Nuestro público objetivo</p>
+            </div>
+            <div class="team-grid">
+                <div class="team-member">
+                    <h3>🧒 Jóvenes</h3>
+                    <p>Estudiantes y jóvenes interesados en videojuegos educativos</p>
+                </div>
+                <div class="team-member">
+                    <h3>🎓 Educadores</h3>
+                    <p>Profesores buscando herramientas lúdicas para el aprendizaje</p>
+                </div>
+                <div class="team-member">
+                    <h3>🏠 Familias</h3>
+                    <p>Padres que buscan entretenimiento educativo para sus hijos</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 6: Ventajas y Beneficios -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2 class="slide-title">Beneficios del Enfoque Sustentable</h2>
+                <p class="slide-subtitle">El impacto educativo de ROLLVENTURE</p>
+            </div>
+            <div class="content-grid">
+                <ul class="feature-list">
+                    <li>🌱 Educación específica en sustentabilidad</li>
+                    <li>♻️ Conciencia sobre desarrollo sustentable</li>
+                    <li>🌍 Comprensión del impacto ambiental</li>
+                    <li>🎮 Aprendizaje a través de la gamificación</li>
+                    <li>📚 Aplicación práctica de conceptos ecológicos</li>
+                </ul>
+                <div class="game-preview">
+                    <h3>🌟 Valor Educativo</h3>
+                    <p class="text-large">ROLLVENTURE está completamente diseñado para enseñar sustentabilidad, convirtiendo conceptos complejos en experiencias divertidas y memorables</p>
+                    <div class="highlight">
+                        <p><strong>🏆 Objetivo:</strong> Formar una nueva generación consciente sobre la importancia del desarrollo sustentable</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 7: Características Sustentables del Juego -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2 class="slide-title">Enfoque en Sustentabilidad</h2>
+                <p class="slide-subtitle">Elementos centrales del desarrollo sustentable en ROLLVENTURE</p>
+            </div>
+            <div class="content-grid">
+                <div>
+                    <div class="highlight">
+                        <h3>🌱 Temática Ambiental Central</h3>
+                        <p>Todo el juego está construido alrededor de conceptos de sustentabilidad y cuidado del medio ambiente como tema principal.</p>
+                    </div>
+                    <div class="highlight">
+                        <h3>♻️ Educación Sustentable</h3>
+                        <p>Los jugadores aprenden sobre principios de desarrollo sustentable de manera práctica e interactiva.</p>
+                    </div>
+                </div>
+                <div>
+                    <div class="highlight">
+                        <h3>🌍 Conciencia Ecológica</h3>
+                        <p>Fomenta la reflexión sobre nuestro impacto en el planeta y la importancia de acciones que cuiden el medio ambiente.</p>
+                    </div>
+                    <div class="highlight">
+                        <h3>📚 Aprendizaje Aplicado</h3>
+                        <p>Conecta los conceptos de sustentabilidad del juego con acciones reales que los jugadores pueden implementar en el cuidado del medio ambiente.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 8: Demo de Funcionalidad -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2 class="slide-title">Demostración</h2>
+                <p class="slide-subtitle">Funcionalidades principales de ROLLVENTURE</p>
+            </div>
+            <div class="content-single">
+                <div class="game-preview" style="margin-bottom: 30px;">
+                    <h3>🎮 Experiencia de Juego</h3>
+                    <p class="text-large">Navegación intuitiva • Mecánicas innovadoras • Diseño responsive</p>
+                </div>
+                <div class="highlight">
+                    <p class="text-large">
+                        <strong>💡 Funcionalidades Clave:</strong><br>
+                        • Sistema de aventuras interactivas<br>
+                        • Mecánicas de juego innovadoras<br>
+                        • Experiencia optimizada para el usuario
+                    </p>
+                </div>
+                <a href="https://jossls.github.io/ROLLVENTURE/" class="game-link" target="_blank">
+                    🎯 Probar Funcionalidad
+                </a>
+            </div>
+        </div>
+
+        <!-- Slide 9: Costos/Precio -->
+        <div class="slide">
+            <div class="slide-header">
+                <h2 class="slide-title">Acceso Sustentable</h2>
+                <p class="slide-subtitle">Educación ambiental sin barreras</p>
+            </div>
+            <div class="content-single">
+                <div class="price-tag">
+                    🌱 100% GRATUITO
+                </div>
+                <div class="highlight">
+                    <p class="text-large">
+                        <strong>🎯 Filosofía:</strong> La educación ambiental debe ser accesible para todos. Nuestro compromiso es democratizar el aprendizaje sobre sustentabilidad.
+                    </p>
+                </div>
+                <div class="team-grid">
+                    <div class="team-member">
+                        <h3>♻️ Sin Costo</h3>
+                        <p>Educación ambiental gratuita para todos</p>
+                    </div>
+                    <div class="team-member">
+                        <h3>🌐 Web-Based</h3>
+                        <p>Sin necesidad de descargas</p>
+                    </div>
+                    <div class="team-member">
+                        <h3>🔄 Mejoras Verdes</h3>
+                        <p>Actualizaciones con más contenido ecológico</p>
+                    </div>
+                </div>
+                <div class="highlight">
+                    <p class="text-large">
+                        <strong>🌍 Impacto Global:</strong> Cada jugador que aprende sobre reciclaje y sustentabilidad contribuye a un planeta más limpio y consciente.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="navigation">
+        <button class="nav-btn" onclick="previousSlide()">← Anterior</button>
+        <button class="nav-btn" onclick="nextSlide()">Siguiente →</button>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+        
+        document.getElementById('total-slides').textContent = totalSlides;
+
+        function showSlide(n) {
+            slides[currentSlide].classList.remove('active');
+            currentSlide = (n + totalSlides) % totalSlides;
+            slides[currentSlide].classList.add('active');
+            document.getElementById('current-slide').textContent = currentSlide + 1;
+        }
+
+        function nextSlide() {
+            showSlide(currentSlide + 1);
+        }
+
+        function previousSlide() {
+            showSlide(currentSlide - 1);
+        }
+
+        // Navegación con teclado
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowLeft') {
+                previousSlide();
+            } else if (e.key === 'ArrowRight') {
+                nextSlide();
+            }
+        });
+
+        // Auto-avance (opcional, comentado)
+        /*
+        setInterval(function() {
+            nextSlide();
+        }, 10000);
+        */
+    </script>
+</body>
+</html>

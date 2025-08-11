@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Rollventures - Versión Eco (con pixel-art)</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:linear-gradient(135deg, #0f0f23, #1a1a2e, #16213e);overflow:hidden;}
+  #game{width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
+  canvas{border:4px solid #4ECDC4;border-radius:15px;box-shadow:0 0 40px rgba(78, 205, 196, 0.3), 0 0 80px rgba(78, 205, 196, 0.1);}
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at 20% 20%, rgba(78, 205, 196, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(255, 215, 0, 0.1) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: -1;
+  }
+</style>
+</head>
+<body>
+<div id="game"></div>
+
+<!-- Phaser 3 -->
+<script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
+
+<script>
+(() => {
+  // ====== CONFIG / RECURSOS ======
+  const WIDTH = 1024;
+  const HEIGHT = 768;
+  const GROUND_Y = HEIGHT - 100;
+
+  // Si quieres usar tu imagen de fondo generada (por ejemplo: assets/bg.png),
+  // pon el path aquí: const BG_IMG = 'assets/bg.png';
+  // Si lo dejas null, se usará un color de fondo por nivel.
+  const BG_IMG = null;
+
+  // Tips ecológicos
+  const tipsEcologicos = [
+    "Reduce, reutiliza y recicla.",
+    "Evita plásticos de un solo uso.",
+    "Planta un árbol y cuida su crecimiento.",
+    "Ahorra agua cerrando la llave al cepillarte.",
+    "Usa bicicleta o transporte público para reducir emisiones."
+  ];
+
+  // Niveles MEJORADOS - Más difíciles y largos
+  const levels = [
+    { name: "Pavimento",    bg: 0x808080, enemyCount: 3,  keyY: 500, hasKragg:false, trashCount:5 },
+    { name: "Playa",        bg: 0xF0E68C, enemyCount: 5,  keyY: 400, hasKragg:false, trashCount:7 },
+    { name: "Selva",        bg: 0x228B22, enemyCount: 7,  keyY: 300, hasKragg:false, trashCount:8 },
+    { name: "Desierto",     bg: 0xDEB887, enemyCount: 9,  keyY: 350, hasKragg:false, trashCount:10 },
+    { name: "Montaña",      bg: 0x696969, enemyCount: 11, keyY: 200, hasKragg:false, trashCount:12 },
+    { name: "Ciudad",       bg: 0x2F4F4F, enemyCount: 13, keyY: 250, hasKragg:false, trashCount:14 },
+    { name: "Laboratorio",  bg: 0x483D8B, enemyCount: 15, keyY: 180, hasKragg:false, trashCount:16 },
+    { name: "Volcán Final", bg: 0xB22222, enemyCount: 0,  keyY: 400, hasKragg:true,  trashCount:20 }
+  ];
+
+  // ====== SCENE PRINCIPAL ======
+  class MainScene extends Phaser.Scene {
+    constructor(){
+      super('main');
+      this.state = 'menu';
+      this.levelIndex = 0;
+      this.score = 0;
+      this.keysCollected = 0;
+      this.lives = 4;
+      this.trashCollected = 0;
+      this.trashTotal = 0;
+      this.energyPower = 0; // NUEVO: Sistema de poder especial
+      this.maxEnergy = 100;
+      this.enemiesKilled = 0; // NUEVO: Contador de enemigos eliminados
+    }
+
+    preload(){
+      // Si BG_IMG está definido, lo cargamos (usuario puede poner assets/bg.png)
+      if (BG_IMG) this.load.image('bgimg', BG_IMG);
+
+      // Sprites de basura embebidos (SVG data URIs) - estilo pixel friendly
+      // Bottle (verde), Can (roja), Bag (verde oscuro)
+      this.load.image('bottle', 'data:image/svg+xml;utf8,\
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">\
+<rect x="26" y="6" width="12" height="8" rx="2" fill="%23222" />\
+<rect x="22" y="14" width="20" height="34" rx="6" fill="%2300b050" stroke="%23000000" stroke-width="2"/>\
+</svg>');
+      this.load.image('can', 'data:image/svg+xml;utf8,\
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">\
+<rect x="16" y="18" width="32" height="28" rx="6" fill="%23e53935" stroke="%23000000" stroke-width="2"/>\
+<rect x="18" y="12" width="28" height="6" rx="3" fill="%23c62828" stroke="%23000000" stroke-width="2"/>\
+</svg>');
+      this.load.image('bag', 'data:image/svg+xml;utf8,\
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">\
+<path d="M20 16 Q24 8 32 10 Q40 12 44 18 Q52 22 48 40 Q20 44 16 26 Q16 20 20 16 Z" fill="%231b5e20" stroke="%23000000" stroke-width="2"/>\
+</svg>');
+      // Key sprite (simple)
+      this.load.image('key', 'data:image/svg+xml;utf8,\
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">\
+<circle cx="18" cy="18" r="8" fill="%23ffd54f" stroke="%23000" stroke-width="2"/>\
+<rect x="24" y="16" width="22" height="8" fill="%23ffd54f" stroke="%23000" stroke-width="2"/>\
+</svg>');
+      // (opcional) small sprite for kragg fireball
+      this.load.image('fire', 'data:image/svg+xml;utf8,\
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">\
+<circle cx="16" cy="16" r="12" fill="%23ff6f00" stroke="%23b24000" stroke-width="2"/>\
+</svg>');
+    }
+
+    create(){
+      // fondo opcional
+      if (BG_IMG){
+        this.add.image(WIDTH/2, HEIGHT/2, 'bgimg').setDisplaySize(WIDTH, HEIGHT).setDepth(-2);
+      }
+
+      this.cameras.main.setBounds(0,0,WIDTH,HEIGHT);
+      this.physics.world.setBounds(0,0,WIDTH,HEIGHT);
+      this.addGameObjects();
+      this.createHUD();
+      this.createMenus();
+      this.input.keyboard.on('keydown-P', () => {
+        if (this.state === 'playing') this.pauseGame();
+      });
+      this.showMenu();
+    }
+
+    addGameObjects(){
+      // plataformas, grupos
+      this.platforms = this.physics.add.staticGroup();
+      this.platforms.create(WIDTH/2, GROUND_Y+50, null).setDisplaySize(WIDTH, 100).refreshBody().setTint(0x555555);
+
+      this.enemies = this.physics.add.group();
+      this.fireballs = this.physics.add.group();
+      this.basuraGroup = this.physics.add.group();
+      this.playerBeams = this.physics.add.group(); // NUEVO: Grupo para rayos del jugador
+    }
+
+    createHUD(){
+      const style = { fontFamily:'Arial', fontSize:'20px', color:'#fff' };
+      this.hud = this.add.container(15,15);
+      this.levelText = this.add.text(0,0,'Nivel: 1 - Pavimento', style);
+      this.keysText = this.add.text(0,28,'Llaves: 0/1', style);
+      this.scoreText = this.add.text(0,56,'Puntos: 0', style);
+      this.trashText = this.add.text(0,84,'Basura: 0/0', style);
+      this.energyText = this.add.text(0,112,'Energía: 0/100', {...style, color:'#00FF00'}); // NUEVO
+      this.heartsContainer = this.add.container(0,140); // Movido más abajo
+      this.hud.add([this.levelText, this.keysText, this.scoreText, this.trashText, this.energyText, this.heartsContainer]);
+    }
+
+    refreshHearts(){
+      this.heartsContainer.removeAll(true);
+      for (let i=0;i<this.lives;i++){
+        const t = this.add.text(28*i,0,'❤️',{fontFamily:'Arial',fontSize:'24px'});
+        this.heartsContainer.add(t);
+      }
+    }
+
+    createMenus(){
+      // helper para paneles
+      const withPanel = (title, buttons) => {
+        const cont = this.add.container(WIDTH/2, HEIGHT/2).setDepth(1000).setVisible(false);
+        
+        // Panel con gradiente y efectos
+        const bg = this.add.rectangle(0,0,800,500,0x000000,0.95).setOrigin(0.5);
+        bg.setStrokeStyle(3, 0x4ECDC4);
+        
+        // Título con efectos de texto
+        const titleText = this.add.text(0,-200,title,{
+          fontFamily:'Arial',
+          fontSize:'48px',
+          color:'#4ECDC4',
+          stroke: '#000000',
+          strokeThickness: 4
+        }).setOrigin(0.5);
+        
+        // Efecto de brillo en el título
+        this.tweens.add({
+          targets: titleText,
+          alpha: 0.7,
+          yoyo: true,
+          repeat: -1,
+          duration: 1500
+        });
+        
+        cont.add([bg,titleText]);
+        let y = -80;
+        buttons.forEach(b=>{
+          const btn = this.makeButton(b.text,0,y,b.cb);
+          cont.add(btn);
+          y += 90;
+        });
+        return cont;
+      };
+
+      this.mainMenu = withPanel('🌿 ROLLVENTURES ECO 🌿',[
+        {text:'🎮 JUGAR', cb: ()=>this.startGame()},
+        {text:'📖 INSTRUCCIONES', cb: ()=>this.showInstructions()},
+        {text:'🏆 CRÉDITOS', cb: ()=>this.showCredits()}
+      ]);
+
+      this.pauseMenu = withPanel('⏸️ PAUSA',[
+        {text:'▶️ CONTINUAR', cb: ()=>this.resumeGame()},
+        {text:'🔄 REINICIAR NIVEL', cb: ()=>this.restartLevel()},
+        {text:'🏠 MENÚ PRINCIPAL', cb: ()=>this.backToMainMenu()}
+      ]);
+
+      this.levelCompleteMenu = withPanel('🎉 ¡NIVEL COMPLETADO!',[
+        {text:'➡️ SIGUIENTE NIVEL', cb: ()=>this.nextLevel()}
+      ]);
+
+      // Añadimos un texto para el tip (será index 2 dentro del cont)
+      this.levelCompleteTip = this.add.text(0,40,'', {
+        fontFamily:'Arial',
+        fontSize:'20px',
+        color:'#FFD700',
+        align:'center',
+        wordWrap:{width:700}
+      }).setOrigin(0.5);
+      this.levelCompleteMenu.add(this.levelCompleteTip);
+
+      this.gameOverMenu = withPanel('💀 GAME OVER',[
+        {text:'🔄 REINTENTAR', cb: ()=>this.restartGame()},
+        {text:'🏠 MENÚ', cb: ()=>this.backToMainMenu()}
+      ]);
+
+      this.victoryMenu = withPanel('🏅 ¡VICTORIA TOTAL!',[
+        {text:'🎮 JUGAR DE NUEVO', cb: ()=>this.restartGame()},
+        {text:'🏠 MENÚ', cb: ()=>this.backToMainMenu()}
+      ]);
+      this.finalScoreText = this.add.text(0,40,'Puntuación Final: 0',{
+        fontFamily:'Arial',
+        fontSize:'24px',
+        color:'#FFD700'
+      }).setOrigin(0.5);
+      this.victoryMenu.add(this.finalScoreText);
+
+      // Instructions & credits mejorados con botones en esquina
+      this.instructionsPanel = withPanel('📖 INSTRUCCIONES',[]);
+      
+      // Botón cerrar en esquina superior derecha del panel
+      const closeInstructionsBtn = this.makeButton('❌ CERRAR', 300, -200, ()=>{
+        this.instructionsPanel.setVisible(false);
+        this.mainMenu.setVisible(true);
+      });
+      this.instructionsPanel.add(closeInstructionsBtn);
+      
+      this.instructionsContent = this.add.text(0,-30,[
+        '🎯 OBJETIVO: Recoge TODA la basura del nivel y luego la llave dorada.',
+        '',
+        '🎮 CONTROLES:',
+        '   ← → Mover el personaje',
+        '   ↑ / ESPACIO Saltar (doble salto disponible)',
+        '   X Disparar rayo de energía (consume 20 energía)',
+        '   P Pausa',
+        '',
+        '⚡ PODER ESPECIAL:',
+        '   • Recoge basura para cargar energía (+5 por ítem)',
+        '   • Usa rayos para destruir enemigos a distancia',
+        '   • Los rayos van disparados para los enemigos abajo de ti',
+        '   • Los rayos también dañan al jefe final',
+        '',
+        '💚 VIDAS EXTRA:',
+        '   • Mata 3 enemigos para ganar 1 vida extra',
+        '   • Máximo 6 vidas (6 corazones)',
+        '',
+        '🏆 PROGRESO:',
+        '   • 8 niveles progresivamente más difíciles',
+        '   • Jefe final: Kragg el Destructor ',
+        '   • 4 vidas (corazones rojos)',
+        '',
+        '🌱 ¡Salva el planeta limpiando cada nivel!'
+      ].join('\n'),{
+        fontFamily:'Arial',
+        fontSize:'18px',
+        color:'#ffffff',
+        align:'left',
+        lineSpacing: 8,
+        wordWrap:{width:700},
+        stroke: '#000000',
+        strokeThickness: 1
+      }).setOrigin(0.5);
+      this.instructionsPanel.add(this.instructionsContent);
+
+      this.creditsPanel = withPanel('🏆 CRÉDITOS',[]);
+      
+      // Botón cerrar en esquina superior derecha del panel
+      const closeCreditsBtn = this.makeButton('❌ CERRAR', 300, -200, ()=>{
+        this.creditsPanel.setVisible(false);
+        this.mainMenu.setVisible(true);
+      });
+      this.creditsPanel.add(closeCreditsBtn);
+      
+      this.creditsContent = this.add.text(0,-60,[
+        '🎮 ROLLVENTURES ECO',
+        '',
+        '👨‍💻 Desarrollo: IDGS010A - 2025',
+        '🎨 Engine: Phaser 3',
+        '',
+        '🌍 MISIÓN ECO:',
+        'Concientizar sobre el cuidado del medio ambiente',
+        'a través de una experiencia de juego divertida.',
+        '',
+        '🌱 Cada nivel completado = Un paso hacia',
+        '     un futuro más verde y sostenible.',
+        '',
+        '💚 ¡Gracias por jugar y cuidar nuestro planeta!'
+      ].join('\n'),{
+        fontFamily:'Arial',
+        fontSize:'20px',
+        color:'#4ECDC4',
+        align:'center',
+        lineSpacing: 10,
+        stroke: '#000000',
+        strokeThickness: 1
+      }).setOrigin(0.5);
+      this.creditsPanel.add(this.creditsContent);
+    }
+
+    makeButton(text,x,y,cb){
+      const cont = this.add.container(x,y);
+      
+      // Botón con gradiente y efectos mejorados
+      const bg = this.add.rectangle(0,0,420,65,0x4ECDC4,1);
+      bg.setStrokeStyle(3,0xFFD700);
+      
+      // Efecto de sombra
+      const shadow = this.add.rectangle(3,3,420,65,0x000000,0.3);
+      
+      const label = this.add.text(0,0,text,{
+        fontFamily:'Arial',
+        fontSize:'22px',
+        color:'#ffffff',
+        stroke: '#000000',
+        strokeThickness: 2
+      }).setOrigin(0.5);
+      
+      cont.add([shadow, bg, label]);
+      
+      // Interactividad mejorada
+      bg.setInteractive({useHandCursor:true})
+        .on('pointerover', () => {
+          // Efecto hover
+          this.tweens.add({
+            targets: bg,
+            scaleX: 1.05,
+            scaleY: 1.05,
+            duration: 150
+          });
+          this.tweens.add({
+            targets: label,
+            scaleX: 1.05,
+            scaleY: 1.05,
+            duration: 150
+          });
+          bg.setFillStyle(0x5FDDD7);
+        })
+        .on('pointerout', () => {
+          // Restaurar tamaño
+          this.tweens.add({
+            targets: bg,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 150
+          });
+          this.tweens.add({
+            targets: label,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 150
+          });
+          bg.setFillStyle(0x4ECDC4);
+        })
+        .on('pointerdown', () => {
+          // Efecto de click
+          this.tweens.add({
+            targets: cont,
+            scaleX: 0.95,
+            scaleY: 0.95,
+            duration: 100,
+            yoyo: true,
+            onComplete: cb
+          });
+        });
+      
+      return cont;
+    }
+
+    showMenu(){
+      this.state='menu';
+      this.mainMenu.setVisible(true);
+      this.hud.setVisible(false);
+      this.pauseMenu.setVisible(false);
+      this.levelCompleteMenu.setVisible(false);
+      this.gameOverMenu.setVisible(false);
+      this.victoryMenu.setVisible(false);
+      this.instructionsPanel.setVisible(false);
+      this.creditsPanel.setVisible(false);
+    }
+
+    showInstructions(){ 
+      this.instructionsPanel.setVisible(true); 
+      this.mainMenu.setVisible(false);
+    }
+    
+    showCredits(){ 
+      this.creditsPanel.setVisible(true); 
+      this.mainMenu.setVisible(false);
+    }
+
+    startGame(){
+      this.score = 0;
+      this.keysCollected = 0;
+      this.lives = 4;
+      this.levelIndex = 0;
+      this.energyPower = 0; // Reset del poder
+      this.enemiesKilled = 0; // Reset del contador de enemigos
+      this.mainMenu.setVisible(false);
+      this.hud.setVisible(true);
+      this.state = 'playing';
+      this.refreshHearts();
+      this.loadLevel(this.levelIndex);
+    }
+
+    restartGame(){
+      this.gameOverMenu.setVisible(false);
+      this.victoryMenu.setVisible(false);
+      this.startGame();
+    }
+
+    backToMainMenu(){
+      this.clearLevel();
+      this.showMenu();
+    }
+
+    restartLevel(){
+      this.pauseMenu.setVisible(false);
+      this.physics.world.resume(); // Asegurar que la física se reanude
+      this.loadLevel(this.levelIndex);
+      this.state='playing';
+    }
+
+    nextLevel(){
+      this.levelCompleteMenu.setVisible(false);
+      this.levelIndex++;
+      if (this.levelIndex >= levels.length){
+        this.victory();
+      } else {
+        this.loadLevel(this.levelIndex);
+        this.state='playing';
+      }
+    }
+
+    victory(){
+      this.state='victory';
+      this.hud.setVisible(false);
+      
+      // Crear ilustración familiar antes de mostrar el menú
+      this.createFamilyIllustration();
+      
+      // Mostrar menú después de un delay para que se vea la ilustración
+      this.time.delayedCall(3000, () => {
+        this.victoryMenu.setVisible(true);
+        this.finalScoreText.setText('Puntuación Final: ' + this.score);
+      });
+    }
+
+    gameOver(){
+      this.state='gameOver';
+      this.hud.setVisible(false);
+      this.gameOverMenu.setVisible(true);
+    }
+
+    pauseGame(){
+      this.state='paused';
+      this.physics.world.pause();
+      this.pauseMenu.setVisible(true);
+    }
+
+    resumeGame(){
+      this.pauseMenu.setVisible(false);
+      this.state='playing';
+      this.physics.world.resume();
+    }
+
+    clearLevel(){
+      if (this.player){ this.player.destroy(); this.player = null; }
+      if (this.playerFace){ this.playerFace.destroy(); this.playerFace = null; } // Limpiar carita del jugador
+      if (this.key){ this.key.destroy(); this.key = null; }
+      this.enemies.clear(true,true);
+      this.fireballs.clear(true,true);
+      this.basuraGroup.clear(true,true);
+      this.playerBeams.clear(true,true); // Limpiar rayos del jugador
+      if (this.kragg){ this.kragg.destroy(); this.kragg = null; }
+    }
+
+    // Nueva función para relanzar basura que cae - MEJORADA: Posición más accesible
+    relanzarBasura(trash) {
+      const tipo = trash.getData('type');
+      const x = 100 + Math.random() * (WIDTH - 200); // Posición X aleatoria
+      const y = 200 + Math.random() * 200; // Altura media accesible (200-400px del techo)
+      
+      trash.setPosition(x, y);
+      trash.body.setVelocity(0, 0); // Detener cualquier velocidad
+      trash.body.setAllowGravity(false); // Asegurar que no tenga gravedad
+      
+      // Reiniciar propiedades de flotación
+      trash.floatDirection = 1;
+      trash.floatSpeed = 20 + Math.random() * 30;
+      trash.originalY = y;
+      trash.floatRange = 40 + Math.random() * 30;
+    }
+
+    // NUEVA función para disparar rayos del jugador - HORIZONTAL COMO FLECHA
+    firePlayerBeam(){
+      if (!this.player) return; // Seguridad
+      
+      // Determinar dirección basada en la última tecla presionada o por defecto derecha
+      let direction = 1; // Por defecto hacia la derecha
+      if (this.cursors.left.isDown || this.lastDirection === 'left') {
+        direction = -1;
+      } else if (this.cursors.right.isDown || this.lastDirection === 'right') {
+        direction = 1;
+      }
+      
+      // Crear bolita verde más grande y visible
+      const beam = this.add.circle(this.player.x + (30 * direction), this.player.y, 12, 0x00FF00);
+      beam.setStrokeStyle(3, 0x32CD32); // Borde más grueso para mejor visibilidad
+      
+      this.physics.add.existing(beam);
+      beam.body.setVelocity(1200 * direction, 0); // SÚPER RÁPIDO EN LA DIRECCIÓN CORRECTA
+      beam.body.setAllowGravity(false); // Sin gravedad - completamente horizontal
+      beam.body.setDrag(0); // Sin resistencia al aire
+      beam.body.setGravityY(0); // Fuerza gravedad 0 explícitamente
+      
+      this.playerBeams.add(beam);
+      
+      // Auto-destruir después de 1.5 segundos (suficiente para cruzar pantalla)
+      this.time.delayedCall(1500, () => {
+        if (beam && beam.scene) {
+          beam.destroy();
+        }
+      });
+    }
+
+    loadLevel(i){
+      this.clearLevel();
+      const level = levels[i];
+
+      // fondo por color (si no hay imagen)
+      if (!BG_IMG) this.cameras.main.setBackgroundColor(level.bg);
+
+      // reset colliders (sencillo)
+      // recreamos plataformas
+      this.platforms.clear(true,true);
+      this.platforms = this.physics.add.staticGroup();
+      this.platforms.create(WIDTH/2, GROUND_Y+50, null).setDisplaySize(WIDTH, 100).refreshBody().setTint(0xffffff);
+
+      // helper para crear plataformas simples
+      const plat = (x,y,w,h)=>{
+        const p = this.add.rectangle(x,y,w,h,0xffffff);
+        this.physics.add.existing(p,true);
+        this.platforms.add(p);
+      };
+
+      // Layout por nivel MEJORADO - Plataformas más complejas y altas
+      switch(i+1){
+        case 1: // Pavimento - Básico
+          plat(200, HEIGHT-250,150,20);
+          plat(500, HEIGHT-350,150,20);
+          plat(750, HEIGHT-200,150,20);
+          plat(350, HEIGHT-450,100,20);
+          break;
+        case 2: // Playa - Más plataformas
+          plat(150, HEIGHT-200,100,20);
+          plat(350, HEIGHT-300,120,20);
+          plat(600, HEIGHT-250,100,20);
+          plat(800, HEIGHT-380,120,20);
+          plat(200, HEIGHT-450,80,20);
+          plat(500, HEIGHT-500,100,20);
+          break;
+        case 3: // Selva - Torres altas
+          plat(100, HEIGHT-180,80,20);
+          plat(250, HEIGHT-280,100,20);
+          plat(450, HEIGHT-380,80,20);
+          plat(650, HEIGHT-220,100,20);
+          plat(850, HEIGHT-450,80,20);
+          plat(300, HEIGHT-550,90,20);
+          plat(700, HEIGHT-520,90,20);
+          break;
+        case 4: // Desierto - Pirámides
+          plat(120, HEIGHT-200,90,20);
+          plat(300, HEIGHT-320,80,20);
+          plat(480, HEIGHT-450,100,20);
+          plat(680, HEIGHT-300,80,20);
+          plat(860, HEIGHT-400,100,20);
+          plat(200, HEIGHT-550,70,20);
+          plat(600, HEIGHT-580,90,20);
+          plat(400, HEIGHT-600,80,20);
+          break;
+        case 5: // Montaña - Escalera gigante
+          plat(100, HEIGHT-150,80,20);
+          plat(200, HEIGHT-250,80,20);
+          plat(320, HEIGHT-350,80,20);
+          plat(450, HEIGHT-450,80,20);
+          plat(580, HEIGHT-550,80,20);
+          plat(710, HEIGHT-450,80,20);
+          plat(840, HEIGHT-350,80,20);
+          plat(400, HEIGHT-600,100,20);
+          break;
+        case 6: // Ciudad - Rascacielos
+          plat(50, HEIGHT-200,60,20);
+          plat(150, HEIGHT-350,60,20);
+          plat(250, HEIGHT-500,60,20);
+          plat(400, HEIGHT-300,80,20);
+          plat(550, HEIGHT-450,80,20);
+          plat(700, HEIGHT-250,80,20);
+          plat(850, HEIGHT-400,80,20);
+          plat(300, HEIGHT-600,100,20);
+          plat(650, HEIGHT-580,100,20);
+          break;
+        case 7: // Laboratorio - Plataformas flotantes complejas
+          plat(80, HEIGHT-180,70,20);
+          plat(200, HEIGHT-320,70,20);
+          plat(350, HEIGHT-480,70,20);
+          plat(500, HEIGHT-280,70,20);
+          plat(650, HEIGHT-420,70,20);
+          plat(800, HEIGHT-300,70,20);
+          plat(150, HEIGHT-550,80,20);
+          plat(400, HEIGHT-600,80,20);
+          plat(700, HEIGHT-580,80,20);
+          plat(300, HEIGHT-650,90,20);
+          break;
+        case 8: // Volcán Final - Plataformas desafiantes
+          plat(200, HEIGHT-200,100,20);
+          plat(400, HEIGHT-350,100,20);
+          plat(600, HEIGHT-500,100,20);
+          plat(150, HEIGHT-450,80,20);
+          plat(750, HEIGHT-400,80,20);
+          plat(350, HEIGHT-600,90,20);
+          plat(550, HEIGHT-650,90,20);
+          break;
+      }
+
+      // Jugador (pixel-like circular) CON CARITA BONITA
+      this.player = this.add.circle(50, 600, 25, 0x4169E1);
+      this.physics.add.existing(this.player);
+      this.player.body.setCollideWorldBounds(true);
+      this.player.body.setBounce(0.0);
+      this.player.body.setMaxVelocity(400, 999);
+      this.player.vy = 0;
+      this.player.canDouble = true;
+      this.player.inv = false;
+      this.player.invTime = 0;
+      this.lastDirection = 'right'; // Recordar última dirección para disparar
+      
+      // AÑADIR CARITA BONITA AL JUGADOR
+      this.playerFace = this.add.container(this.player.x, this.player.y);
+      
+      // Ojos
+      const leftEye = this.add.circle(-8, -8, 4, 0xFFFFFF);
+      const rightEye = this.add.circle(8, -8, 4, 0xFFFFFF);
+      const leftPupil = this.add.circle(-8, -8, 2, 0x000000);
+      const rightPupil = this.add.circle(8, -8, 2, 0x000000);
+      
+      // Boca sonriente
+      const mouth = this.add.arc(0, 5, 8, 0, Math.PI, false, undefined, 0x000000, 2);
+      
+      this.playerFace.add([leftEye, rightEye, leftPupil, rightPupil, mouth]);
+
+      // *** MEJORADO: Generar basura ACCESIBLE y con sistema de relanzamiento ***
+      this.trashCollected = 0;
+      this.trashTotal = level.trashCount;
+      this.basuraGroup.clear(true,true);
+      const trashTypes = ['bottle','can','bag'];
+      
+      for (let t=0; t<level.trashCount; t++){
+        const tipo = Phaser.Utils.Array.GetRandom(trashTypes);
+        const x = 150 + t*120 + Math.random()*80;
+        // *** POSICIÓN MÁS ACCESIBLE: Entre 200-400px del techo (altura media) ***
+        const y = 200 + Math.random() * 200;
+        
+        const trash = this.physics.add.sprite(x, y, tipo);
+        trash.setScale(0.6 + (Math.random()*0.2));
+        
+        // *** GRAVEDAD COMPLETAMENTE DESACTIVADA ***
+        trash.body.setAllowGravity(false);
+        trash.body.setVelocity(0, 0); // Sin velocidad inicial
+        
+        // Propiedades de flotación
+        trash.floatDirection = 1;
+        trash.floatSpeed = 20 + Math.random() * 30;
+        trash.originalY = y;
+        trash.floatRange = 40 + Math.random() * 30;
+        
+        trash.setData('type', tipo);
+        this.basuraGroup.add(trash);
+      }
+
+      // llave
+      this.key = this.add.image(900, level.keyY, 'key');
+      this.key.setScale(0.8);
+      this.physics.add.existing(this.key,true);
+
+      // enemigos MEJORADOS - Sin caritas, solo círculos simples
+      if (level.hasKragg){
+        this.createKragg();
+      } else {
+        for (let e=0; e<level.enemyCount; e++){
+          // Tipos de enemigos más variados
+          const enemyType = Math.floor(e / 2) % 3;
+          let color, speed, size;
+          
+          switch(enemyType) {
+            case 0: // Enemigo básico (rojo)
+              color = 0xDC143C;
+              speed = 60;
+              size = 20;
+              break;
+            case 1: // Enemigo rápido (naranja)
+              color = 0xFF4500;
+              speed = 120;
+              size = 18;
+              break;
+            case 2: // Enemigo grande (púrpura)
+              color = 0x8B008B;
+              speed = 40;
+              size = 25;
+              break;
+          }
+          
+          const enemy = this.add.circle(
+            150 + (e * 80) + Math.random() * 100, 
+            HEIGHT - 150 - Math.random() * 200, // Altura variable
+            size, 
+            color
+          );
+          
+          this.physics.add.existing(enemy);
+          enemy.body.setImmovable(true);
+          enemy.body.moves = false;
+          enemy.patrolStart = enemy.x - (100 + Math.random() * 100);
+          enemy.patrolEnd = enemy.x + (100 + Math.random() * 100);
+          enemy.dir = Math.random() > 0.5 ? 1 : -1;
+          enemy.speed = speed + (Math.random() * 20);
+          enemy.enemyType = enemyType;
+          this.enemies.add(enemy);
+        }
+      }
+
+      // colisiones
+      this.physics.add.collider(this.player, this.platforms, ()=>{
+        this.player.onGround = true;
+        this.player.canDouble = true;
+      }, null, this);
+
+      // overlap basura -> recoger + CARGAR ENERGÍA
+      this.physics.add.overlap(this.player, this.basuraGroup, (player, trash)=>{
+        // sonido o efecto aquí (si quieres)
+        trash.destroy();
+        this.trashCollected++;
+        this.score += 20;
+        
+        // NUEVO: Cargar energía al recoger basura
+        this.energyPower += 5; // +5 energía por basura
+        if (this.energyPower > this.maxEnergy) this.energyPower = this.maxEnergy;
+        
+        this.updateHUD();
+      });
+
+      // overlap llave -> solo si basura recogida
+      this.physics.add.overlap(this.player, this.key, ()=>{
+        if (this.trashCollected >= this.trashTotal && !this.key.collected){
+          this.key.collected = true;
+          this.key.destroy();
+          this.keysCollected++;
+          this.score += 100;
+          this.updateHUD();
+          this.time.delayedCall(500, ()=>this.levelComplete());
+        } else {
+          // pequeño feedback: si trata de tomarla antes de tiempo, la 'parpadea'
+          if (this.key) {
+            this.tweens.add({
+              targets: this.key,
+              alpha: 0.3,
+              yoyo: true,
+              duration: 200,
+              repeat: 2
+            });
+          }
+        }
+      });
+
+      // overlaps enemigos - NUEVO: Se pueden destruir con rayos
+      this.physics.add.overlap(this.player, this.enemies, ()=>{ this.takeDamage(); });
+      
+      // NUEVO: Rayos vs enemigos - CON SISTEMA DE VIDAS EXTRA
+      this.physics.add.overlap(this.playerBeams, this.enemies, (beam, enemy) => {
+        if (beam && beam.scene) {
+          this.playerBeams.remove(beam);
+          beam.destroy();
+        }
+        if (enemy && enemy.scene) {
+          this.enemies.remove(enemy);
+          enemy.destroy();
+          this.enemiesKilled++; // Incrementar contador
+          
+          // Cada 3 enemigos = vida extra (máximo 6 vidas)
+          if (this.enemiesKilled % 3 === 0 && this.lives < 6) {
+            this.lives++;
+            this.refreshHearts();
+            // Efecto visual de vida ganada
+            const lifeText = this.add.text(this.player.x, this.player.y - 50, '+1 VIDA!', {
+              fontFamily: 'Arial',
+              fontSize: '24px',
+              color: '#00FF00',
+              stroke: '#000000',
+              strokeThickness: 3
+            }).setOrigin(0.5);
+            
+            this.tweens.add({
+              targets: lifeText,
+              y: lifeText.y - 50,
+              alpha: 0,
+              duration: 1500,
+              onComplete: () => lifeText.destroy()
+            });
+          }
+        }
+        this.score += 50;
+        this.updateHUD();
+      });
+
+      if (this.kragg){
+        this.physics.add.overlap(this.player, this.kragg, (player, kragg)=>{
+          if (this.player.body.velocity.y > 0 && player.y < kragg.y){
+            this.hitKragg();
+          } else {
+            this.takeDamage();
+          }
+        });
+        this.physics.add.overlap(this.player, this.fireballs, (player, fb)=>{
+          fb.destroy();
+          this.takeDamage();
+        });
+        
+        // NUEVO: Rayos vs Kragg - CORREGIDO PARA REQUERIR 4 DISPAROS
+        this.physics.add.overlap(this.playerBeams, this.kragg, (beam, kragg) => {
+          if (beam && beam.scene) {
+            this.playerBeams.remove(beam);
+            beam.destroy();
+          }
+          this.hitKragg();
+        });
+      }
+
+      // entradas
+      this.cursors = this.input.keyboard.createCursorKeys();
+      this.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+      this.xKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X); // NUEVO: Tecla X para disparar
+
+      this.updateHUD();
+      this.refreshHearts();
+    }
+
+    createKragg(){
+      this.kragg = this.add.circle(WIDTH/2, HEIGHT-200, 50, 0x000000).setStrokeStyle(6,0x8B0000); // Más grande
+      this.kragg.hp = 4; // EXACTAMENTE 4 rayos para vencer - CONFIRMAR
+      this.kragg.maxHp = 4; // Nueva propiedad para mostrar progreso
+      this.physics.add.existing(this.kragg);
+      this.kragg.body.setImmovable(true);
+      this.kragg.body.moves = false;
+      this.kragg.dir = 1;
+      this.kragg.speed = 100; // Más lento pero más peligroso
+      this.kragg.timer = 0;
+      this.kragg.phase = 1;
+      
+      // NUEVO: Crear indicador de vida de Kragg
+      this.kraggHpText = this.add.text(WIDTH/2, 50, 'KRAGG HP: 4/4', {
+        fontFamily: 'Arial',
+        fontSize: '32px',
+        color: '#FF0000',
+        stroke: '#000000',
+        strokeThickness: 3,
+        align: 'center'
+      }).setOrigin(0.5);
+    }
+
+    hitKragg(){
+      if (!this.kragg) return; // Seguridad
+      
+      this.kragg.hp--;
+      this.score += 200;
+      
+      // NUEVO: Actualizar indicador de vida
+      if (this.kraggHpText) {
+        this.kraggHpText.setText(`KRAGG HP: ${this.kragg.hp}/${this.kragg.maxHp}`);
+        
+        // Efecto visual cuando recibe daño
+        this.tweens.add({
+          targets: this.kragg,
+          alpha: 0.3,
+          yoyo: true,
+          duration: 200,
+          repeat: 2
+        });
+        
+        // Texto de daño flotante
+        const damageText = this.add.text(this.kragg.x, this.kragg.y - 70, '-1 HP!', {
+          fontFamily: 'Arial',
+          fontSize: '28px',
+          color: '#FFFF00',
+          stroke: '#FF0000',
+          strokeThickness: 3
+        }).setOrigin(0.5);
+        
+        this.tweens.add({
+          targets: damageText,
+          y: damageText.y - 50,
+          alpha: 0,
+          duration: 1500,
+          onComplete: () => damageText.destroy()
+        });
+      }
+      
+      this.updateHUD();
+      this.player.body.setVelocityY(-400); // Rebote del jugador
+      
+      if (this.kragg.hp <= 0){
+        // NUEVO: Efectos especiales de muerte de Kragg
+        const victoryText = this.add.text(WIDTH/2, HEIGHT/2, '🔥 ¡KRAGG DERROTADO! 🔥', {
+          fontFamily: 'Arial',
+          fontSize: '48px',
+          color: '#FFD700',
+          stroke: '#FF0000',
+          strokeThickness: 4,
+          align: 'center'
+        }).setOrigin(0.5);
+        
+        this.tweens.add({
+          targets: victoryText,
+          scaleX: 1.2,
+          scaleY: 1.2,
+          yoyo: true,
+          duration: 500,
+          repeat: 3,
+          onComplete: () => victoryText.destroy()
+        });
+        
+        if (this.kraggHpText) {
+          this.kraggHpText.destroy();
+          this.kraggHpText = null;
+        }
+        
+        this.kragg.destroy();
+        this.kragg = null;
+        
+        // Delay antes de la victoria para mostrar efectos
+        this.time.delayedCall(2000, () => {
+          this.victory();
+        });
+      }
+    }
+
+    levelComplete(){
+      if (this.levelIndex === levels.length-1){
+        this.victory();
+        return;
+      }
+      this.state='levelComplete';
+      this.score += 200;
+      this.updateHUD();
+      const tip = Phaser.Utils.Array.GetRandom(tipsEcologicos);
+      this.levelCompleteTip.setText('🌱 Tip ecológico:\n' + tip);
+      this.levelCompleteMenu.setVisible(true);
+    }
+
+    updateHUD(){
+      this.levelText.setText(`Nivel: ${this.levelIndex+1} - ${levels[this.levelIndex].name}`);
+      this.keysText.setText(`Llaves: ${this.keysCollected}/1`);
+      this.scoreText.setText(`Puntos: ${this.score}`);
+      this.trashText.setText(`Basura: ${this.trashCollected}/${this.trashTotal}`);
+      this.energyText.setText(`Energía: ${this.energyPower}/${this.maxEnergy}`); // NUEVO
+    }
+
+    takeDamage(){
+      if (this.player.inv) return;
+      this.lives--;
+      this.refreshHearts();
+      this.player.inv = true;
+      this.player.invTime = 2000;
+      this.player.setFillStyle(0xFF0000);
+      if (this.lives <= 0){
+        this.gameOver();
+      }
+    }
+
+    // NUEVA función para crear ilustración familiar al final
+    createFamilyIllustration(){
+      // Limpiar pantalla
+      this.clearLevel();
+      
+      // Limpiar indicador de Kragg si existe
+      if (this.kraggHpText) {
+        this.kraggHpText.destroy();
+        this.kraggHpText = null;
+      }
+      
+      // Fondo especial para la escena final
+      this.cameras.main.setBackgroundColor(0x87CEEB); // Azul cielo
+      
+      // Título emotivo
+      const titleText = this.add.text(WIDTH/2, 100, '🌟 ¡MISIÓN CUMPLIDA! 🌟', {
+        fontFamily: 'Arial',
+        fontSize: '48px',
+        color: '#FFD700',
+        stroke: '#000000',
+        strokeThickness: 4,
+        align: 'center'
+      }).setOrigin(0.5);
+      
+      const subtitleText = this.add.text(WIDTH/2, 160, 'La familia se reúne en un mundo limpio', {
+        fontFamily: 'Arial',
+        fontSize: '24px',
+        color: '#4169E1',
+        stroke: '#FFFFFF',
+        strokeThickness: 2,
+        align: 'center'
+      }).setOrigin(0.5);
+      
+      // Crear la familia en el centro de la pantalla
+      const centerX = WIDTH/2;
+      const centerY = HEIGHT/2 + 50;
+      
+      // Bolita azul protagonista (papá/mamá) - MÁS GRANDE
+      const hero = this.add.circle(centerX, centerY, 35, 0x4169E1);
+      hero.setStrokeStyle(3, 0x000080);
+      
+      // Carita del héroe (más feliz que nunca)
+      const heroFace = this.add.container(centerX, centerY);
+      const heroLeftEye = this.add.circle(-12, -12, 5, 0xFFFFFF);
+      const heroRightEye = this.add.circle(12, -12, 5, 0xFFFFFF);
+      const heroLeftPupil = this.add.circle(-12, -12, 3, 0x000000);
+      const heroRightPupil = this.add.circle(12, -12, 3, 0x000000);
+      const heroMouth = this.add.arc(0, 8, 12, 0, Math.PI, false, undefined, 0x000000, 3);
+      heroFace.add([heroLeftEye, heroRightEye, heroLeftPupil, heroRightPupil, heroMouth]);
+      
+      // Bolita rosa (pareja) - Al lado del héroe
+      const partner = this.add.circle(centerX + 80, centerY, 32, 0xFF69B4);
+      partner.setStrokeStyle(3, 0xC71585);
+      
+      // Carita de la pareja
+      const partnerFace = this.add.container(centerX + 80, centerY);
+      const partnerLeftEye = this.add.circle(-10, -10, 4, 0xFFFFFF);
+      const partnerRightEye = this.add.circle(10, -10, 4, 0xFFFFFF);
+      const partnerLeftPupil = this.add.circle(-10, -10, 2, 0x000000);
+      const partnerRightPupil = this.add.circle(10, -10, 2, 0x000000);
+      const partnerMouth = this.add.arc(0, 6, 10, 0, Math.PI, false, undefined, 0x000000, 2);
+      partnerFace.add([partnerLeftEye, partnerRightEye, partnerLeftPupil, partnerRightPupil, partnerMouth]);
+      
+      // Hijito amarillo (izquierda)
+      const child1 = this.add.circle(centerX - 60, centerY + 40, 22, 0xFFD700);
+      child1.setStrokeStyle(2, 0xFFA500);
+      
+      // Carita del hijito amarillo
+      const child1Face = this.add.container(centerX - 60, centerY + 40);
+      const child1LeftEye = this.add.circle(-7, -7, 3, 0xFFFFFF);
+      const child1RightEye = this.add.circle(7, -7, 3, 0xFFFFFF);
+      const child1LeftPupil = this.add.circle(-7, -7, 1.5, 0x000000);
+      const child1RightPupil = this.add.circle(7, -7, 1.5, 0x000000);
+      const child1Mouth = this.add.arc(0, 4, 6, 0, Math.PI, false, undefined, 0x000000, 2);
+      child1Face.add([child1LeftEye, child1RightEye, child1LeftPupil, child1RightPupil, child1Mouth]);
+      
+      // Hijita verde (derecha)
+      const child2 = this.add.circle(centerX + 40, centerY + 45, 20, 0x32CD32);
+      child2.setStrokeStyle(2, 0x228B22);
+      
+      // Carita de la hijita verde
+      const child2Face = this.add.container(centerX + 40, centerY + 45);
+      const child2LeftEye = this.add.circle(-6, -6, 3, 0xFFFFFF);
+      const child2RightEye = this.add.circle(6, -6, 3, 0xFFFFFF);
+      const child2LeftPupil = this.add.circle(-6, -6, 1.5, 0x000000);
+      const child2RightPupil = this.add.circle(6, -6, 1.5, 0x000000);
+      const child2Mouth = this.add.arc(0, 3, 5, 0, Math.PI, false, undefined, 0x000000, 2);
+      child2Face.add([child2LeftEye, child2RightEye, child2LeftPupil, child2RightPupil, child2Mouth]);
+      
+      // Efectos especiales: corazones flotando
+      for (let i = 0; i < 8; i++) {
+        const heart = this.add.text(
+          centerX - 150 + Math.random() * 300,
+          centerY - 100 + Math.random() * 200,
+          '💚',
+          { fontSize: '24px' }
+        );
+        
+        this.tweens.add({
+          targets: heart,
+          y: heart.y - 100,
+          alpha: 0,
+          duration: 3000 + Math.random() * 2000,
+          delay: Math.random() * 1000,
+          repeat: -1
+        });
+      }
+      
+      // Mensaje final
+      const finalMessage = this.add.text(WIDTH/2, HEIGHT - 120, 
+        '🌍 Gracias a ti, la familia vive en un mundo más limpio 🌍\n¡El planeta Tierra te lo agradece!', {
+        fontFamily: 'Arial',
+        fontSize: '22px',
+        color: '#2E8B57',
+        stroke: '#FFFFFF',
+        strokeThickness: 2,
+        align: 'center'
+      }).setOrigin(0.5);
+      
+      // Animaciones de entrada para la familia
+      [hero, partner, child1, child2].forEach((member, index) => {
+        member.setScale(0);
+        this.tweens.add({
+          targets: member,
+          scaleX: 1,
+          scaleY: 1,
+          duration: 800,
+          delay: index * 300,
+          ease: 'Back.easeOut'
+        });
+      });
+      
+      // Animación de las caritas (aparecen después de las bolitas)
+      [heroFace, partnerFace, child1Face, child2Face].forEach((face, index) => {
+        face.setAlpha(0);
+        this.tweens.add({
+          targets: face,
+          alpha: 1,
+          duration: 500,
+          delay: 1200 + (index * 300)
+        });
+      });
+      
+      // Animación del título
+      this.tweens.add({
+        targets: [titleText, subtitleText],
+        y: '-=20',
+        yoyo: true,
+        duration: 1500,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+      });
+    }
+
+    update(time, delta){
+      if (this.state !== 'playing') return;
+      const dt = delta/1000;
+
+      // NUEVO: Sistema de disparo con energía - CORREGIDO
+      if (this.xKey && Phaser.Input.Keyboard.JustDown(this.xKey) && this.energyPower >= 20) {
+        this.firePlayerBeam();
+        this.energyPower -= 20; // Consume 20 de energía
+        this.updateHUD();
+      }
+
+      // movimiento CON ACTUALIZACIÓN DE CARITA DEL JUGADOR Y DIRECCIÓN
+      const speed = 250;
+      if (this.cursors.left.isDown){
+        this.player.body.setVelocityX(-speed);
+        this.lastDirection = 'left'; // Guardar dirección
+      } else if (this.cursors.right.isDown){
+        this.player.body.setVelocityX(speed);
+        this.lastDirection = 'right'; // Guardar dirección
+      } else {
+        this.player.body.setVelocityX(0);
+      }
+      
+      // Actualizar posición de la carita del jugador
+      if (this.playerFace) {
+        this.playerFace.x = this.player.x;
+        this.playerFace.y = this.player.y;
+      }
+
+      // salto y doble salto - MEJORADO: Saltos más altos
+      if ((Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.space))){
+        if (this.player.onGround){
+          this.player.body.setVelocityY(-650); // Aumentado de -500 a -650
+          this.player.onGround = false;
+        } else if (this.player.canDouble){
+          this.player.body.setVelocityY(-600); // Aumentado de -450 a -600
+          this.player.canDouble = false;
+        }
+      }
+
+      // invulnerabilidad
+      if (this.player.inv){
+        this.player.invTime -= delta;
+        if (this.player.invTime <= 0){
+          this.player.inv = false;
+          this.player.setFillStyle(0x4169E1);
+        }
+      }
+
+      // caer fuera del mundo
+      if (this.player.y > HEIGHT + 100){
+        this.takeDamage();
+        this.player.x = 50;
+        this.player.y = 600;
+        this.player.body.setVelocity(0);
+      }
+
+      // patrullas SIN caritas (simplificado)
+      this.enemies.getChildren().forEach(en => {
+        en.x += en.dir * en.speed * dt;
+        if (en.x < en.patrolStart){ en.x = en.patrolStart; en.dir = 1; }
+        if (en.x > en.patrolEnd){ en.x = en.patrolEnd; en.dir = -1; }
+      });
+
+      // kragg
+      if (this.kragg){
+        this.kragg.x += this.kragg.dir * this.kragg.speed * dt;
+        if (this.kragg.x <= 100 || this.kragg.x >= WIDTH - 100) this.kragg.dir *= -1;
+        this.kragg.timer -= delta;
+        if (this.kragg.timer <= 0){
+          this.fireKragg();
+          this.kragg.timer = Math.max(1000 - (this.kragg.phase * 200), 500);
+        }
+        if (this.kragg.hp <= 2 && this.kragg.phase===1){
+          this.kragg.phase = 2; this.kragg.speed = 160;
+        }
+        if (this.kragg.hp <= 1 && this.kragg.phase===2){
+          this.kragg.phase = 3; this.kragg.speed = 200;
+        }
+      }
+
+      // *** MEJORADO: Movimiento flotante + sistema de relanzamiento ***
+      this.basuraGroup.getChildren().forEach(trash => {
+        // Rotación lenta
+        trash.angle += 30 * dt;
+        
+        // Movimiento flotante vertical controlado
+        if (trash.floatDirection === 1) {
+          trash.y -= trash.floatSpeed * dt;
+          if (trash.y <= trash.originalY - trash.floatRange) {
+            trash.floatDirection = -1;
+          }
+        } else {
+          trash.y += trash.floatSpeed * dt;
+          if (trash.y >= trash.originalY + trash.floatRange) {
+            trash.floatDirection = 1;
+          }
+        }
+        
+        // *** SISTEMA DE RELANZAMIENTO: Si cae muy abajo, lo relanzamos ***
+        if (trash.y > GROUND_Y - 50) {
+          this.relanzarBasura(trash);
+        }
+      });
+
+      // Limpiar rayos que salen de la pantalla - AMBAS DIRECCIONES
+      this.playerBeams.getChildren().forEach(beam => {
+        if (beam.x > WIDTH + 50 || beam.x < -50) { // Si sale por cualquier lado de la pantalla
+          this.playerBeams.remove(beam);
+          beam.destroy();
+        }
+      });
+    }
+
+    fireKragg(){
+      const count = this.kragg.phase;
+      for (let i=0;i<count;i++){
+        const baseAngle = Phaser.Math.Angle.Between(this.kragg.x, this.kragg.y, this.player.x, this.player.y);
+        const angle = baseAngle + (i - count/2 + 0.5) * 0.3;
+        const speed = 300;
+        const fb = this.physics.add.image(this.kragg.x, this.kragg.y, 'fire');
+        fb.body.setVelocity(Math.cos(angle)*speed, Math.sin(angle)*speed);
+        fb.life = 3000;
+        this.fireballs.add(fb);
+        this.time.delayedCall(3000, ()=>{ if (fb) fb.destroy(); });
+      }
+    }
+  }
+
+  // ====== CONFIG PHASER ======
+  const config = {
+    type: Phaser.AUTO,
+    width: WIDTH,
+    height: HEIGHT,
+    parent: 'game',
+    backgroundColor: '#000000',
+    physics: {
+      default: 'arcade',
+      arcade: {
+        gravity: { y: 1000 },
+        debug: false
+      }
+    },
+    scene: [ MainScene ]
+  };
+
+  new Phaser.Game(config);
+
+})();
+</script>
+</body>
+</html>
